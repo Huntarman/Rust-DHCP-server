@@ -1,0 +1,49 @@
+services:
+  db:
+    container_name: rust-dhcp-db
+    restart: always
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - dhcp_network
+
+  rust_dhcp_server:
+    build:
+      context: .
+    container_name: rust_dhcp_server
+    env_file:
+      - .env
+    networks:
+      - dhcp_network
+    ports:
+      - "67:67/udp"
+    depends_on:
+      - db
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - RUST_LOG=info
+    privileged: true
+    entrypoint: ["/usr/local/bin/wait-for-db.sh", "/usr/local/bin/server"]
+
+  dhcp_client:
+    image: busybox
+    container_name: dhcp_client
+    networks:
+      - dhcp_network
+    entrypoint: ["udhcpc", "-i", "eth0"]
+
+volumes:
+  postgres_data:
+
+networks:
+  dhcp_network:
+    external: true
