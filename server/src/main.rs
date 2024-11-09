@@ -1,11 +1,23 @@
-mod create_db_tables;
 use tokio_postgres::NoTls;
 use dotenvy::dotenv;
 use std::env;
 use std::error::Error;
+use std::sync::Arc;
 use tokio::net::{UdpSocket};
+use tokio_postgres::Client;
 use tokio::time::{timeout, Duration};
 use tokio::task;
+
+mod utility;
+mod server_config;
+mod set_up;
+
+use crate::utility::types::DHCPMessage;
+use crate::set_up::create_db_tables::create_db;
+use crate::server_config::{load_config, Config};
+
+mod server;
+use server::Server;
 
 const DHCP_SERVER_PORT: u16 = 67;
 const DHCP_CLIENT_PORT: u16 = 68;
@@ -24,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     });
     println!("Connected to database");
 
-    if let Err(e) = create_db_tables::create_db(&client).await {
+    if let Err(e) = create_db(&client).await {
         eprintln!("Error creating db: {}", e);
         return Ok(());
     }
@@ -36,35 +48,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     dhcp_socket.set_broadcast(true)?;
     println!("DHCP server listening on port {}", DHCP_SERVER_PORT);
     
-    let mut buf = [0u8; MAX_BUFFER_SIZE];
-    
-    loop {
-        match timeout(Duration::from_secs(10), dhcp_socket.recv_from(&mut buf)).await {
-            Ok(Ok((size, addr))) => {
-                println!("Received {} bytes from {}", size, addr);
-                let dhcp_packet = buf[..size].to_vec();
-                let cloned_packet = dhcp_packet.clone();
-                task::spawn( async move { 
-                    match cloned_packet[0] {
-                        1 => println!("Received DHCP Discover"),
-                        3 => println!("Received DHCP Request"),
-                        7 => println!("Received DHCP Release"),
-                        8 => println!("Received DHCP Inform"),
-                        _ => println!("Received not valid DHCP message type")
-                    }
-                }
-                 );
+    let config = load_config("app/server-config.json").expect("Failed to load configuration");
 
-                if let Err(e) = dhcp_socket.send_to(&dhcp_packet, &addr).await {
-                    eprintln!("Failed to send data to {}: {}", addr, e);
-                } else {
-                    println!("Sent message back to {}", addr);
-                }
-            },
-            Ok(Err(e)) => eprintln!("Failed to receive data: {}", e),
-            Err(_) => println!("Receive timed out"),
-        }
-    }
+    let server = Server::new(config, dhcp_socket, client).await;
+    Arc::new(server).start().await;
 
     return Ok(());
 }

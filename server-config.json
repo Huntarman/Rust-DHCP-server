@@ -1,0 +1,16 @@
+{
+  "server": {
+    "lease_time": 60,
+    "renewal_time": 30,
+    "subnet_mask": "255.255.255.0",
+    "default_gateway": "192.168.10.1",
+    "dns_server": "10.0.2.1",
+    "domain_name": "example.local",
+    "ip_address": "192.168.10.4"
+  },
+  "ip_pool": {
+    "range_start": "192.168.10.100",
+    "range_end": "192.168.10.150"
+  },
+  "restricted_ips": ["192.168.10.102", "192.168.10.122", "192.168.10.150"]
+}

@@ -4,6 +4,7 @@ WORKDIR /usr/src/rust-dhcp-server
 
 COPY server/Cargo.toml server/Cargo.lock ./
 COPY server/src ./src
+COPY server-config.json ./server-config.json
 
 RUN cargo build --release
 
@@ -17,6 +18,7 @@ COPY wait-for-db.sh /usr/local/bin/wait-for-db.sh
 RUN chmod +x /usr/local/bin/wait-for-db.sh
 
 COPY --from=builder /usr/src/rust-dhcp-server/target/release/server /usr/local/bin/server
+COPY --from=builder  /usr/src/rust-dhcp-server/server-config.json /app/server-config.json
 
 ENTRYPOINT ["/usr/local/bin/wait-for-db.sh", "/usr/local/bin/server"]
 

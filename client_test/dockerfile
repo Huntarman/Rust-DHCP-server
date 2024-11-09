@@ -1,0 +1,8 @@
+FROM python:3.11-slim
+
+RUN pip install scapy
+
+COPY create_dhcp_message.py /usr/src/app/create_dhcp_message.py
+
+WORKDIR /usr/src/app
+ENTRYPOINT ["python", "create_dhcp_message.py"]

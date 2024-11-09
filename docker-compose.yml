@@ -21,7 +21,8 @@ services:
     env_file:
       - .env
     networks:
-      - dhcp_network
+      dhcp_network:
+        ipv4_address: 192.168.10.4
     ports:
       - "67:67/udp"
     depends_on:
@@ -39,7 +40,17 @@ services:
     container_name: dhcp_client
     networks:
       - dhcp_network
-    entrypoint: ["udhcpc", "-i", "eth0"]
+    entrypoint: ["udhcpc", "-i", "eth0", "-f", "-R"]
+
+  # client_test:
+  #   build:
+  #     context: ./client_test
+  #   container_name: client_test
+  #   networks:
+  #     - dhcp_network
+  #   depends_on:
+  #     - rust_dhcp_server
+  #   entrypoint: ["python", "/usr/src/app/create_dhcp_packets.py"]
 
 volumes:
   postgres_data:
