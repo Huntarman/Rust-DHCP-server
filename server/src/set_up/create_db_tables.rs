@@ -3,49 +3,18 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::io::Error as StdError;
 use std::fmt;
 
-use crate::server_config::{load_config, Config, generate_ip_pool};
+use crate::server_config::{load_config, generate_ip_pool};
 
 use crate::set_up::config_hash;
 
 pub async fn create_db (client: &tokio_postgres::Client) -> Result<(), CustomError> {
 
-    // create_clients_table(&client).await?;
     create_ip_address_table(&client).await?;
-    // create_dhcp_leases_table(&client).await?;
+    create_lease_history_table(&client).await?;
     fill_ip_addresses_table(&client).await?;
 
     return Ok(());
 }
-
-// async fn create_clients_table (client: &tokio_postgres::Client) -> Result<(), TokioError>{
-    
-//     let table_exists_query = "
-//         SELECT EXISTS (
-//             SELECT FROM information_schema.tables 
-//             WHERE table_name = 'dhcp_clients'
-//         );
-//     ";
-//     let row = client.query_one(table_exists_query, &[]).await?;
-//     let table_exists: bool = row.get(0);
-
-//     if table_exists {
-//         println!("Table dhcp_clients already exists - skipping creation");
-//     } else {
-//         let create_dhcp_clients_table_query = "
-//             CREATE TABLE IF NOT EXISTS dhcp_clients (
-//                 client_id SERIAL PRIMARY KEY,
-//                 mac_address MACADDR NOT NULL UNIQUE,
-//                 client_identifier VARCHAR(255) UNIQUE,
-//                 hostname VARCHAR(255),
-//                 created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-//                 updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-//             )
-//         ";
-//         client.execute(create_dhcp_clients_table_query, &[]).await?;
-//         println!("Table dhcp_clients created successfully");
-//     }
-//     return Ok(());
-// }
 
 async fn create_ip_address_table (client: &tokio_postgres::Client) -> Result<(), TokioError>{
     let table_exists_query = "
@@ -75,39 +44,77 @@ async fn create_ip_address_table (client: &tokio_postgres::Client) -> Result<(),
     return Ok(());
 }
 
-// async fn create_dhcp_leases_table (client: &tokio_postgres::Client) -> Result<(), TokioError>{
-//     let table_exists_query = "
-//         SELECT EXISTS (
-//             SELECT FROM information_schema.tables 
-//             WHERE table_name = 'dhcp_leases'
-//         );
-//     ";
-//     let row = client.query_one(table_exists_query, &[]).await?;
-//     let table_exists: bool = row.get(0);
+async fn create_lease_history_table (client: &tokio_postgres::Client) -> Result<(), TokioError>{
+    let table_exists_query = "
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = 'lease_history'
+        );
+    ";
+    let row = client.query_one(table_exists_query, &[]).await?;
+    let table_exists: bool = row.get(0);
 
-//     if table_exists {
-//         println!("Table dhcp_leases already exists - skipping creation");
-//     } else {
-//         let create_dhcp_leases_table_query = "
-//             CREATE TABLE dhcp_leases (
-//                 lease_id SERIAL PRIMARY KEY,
-//                 ip_address INET REFERENCES ip_addresses(ip_address) ON DELETE CASCADE,
-//                 client_id INTEGER REFERENCES dhcp_clients(client_id) ON DELETE CASCADE,
-//                 lease_start TIMESTAMP NOT NULL,
-//                 lease_end TIMESTAMP NOT NULL,
-//                 lease_duration INTERVAL NOT NULL,
-//                 lease_status VARCHAR(50) CHECK (lease_status IN ('ACTIVE', 'EXPIRED', 'RENEWING', 'RELEASED')),
-//                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-//                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-//             );
-//         ";
-//         client.execute(create_dhcp_leases_table_query, &[]).await?;
-//         println!("Table dhcp_leases created successfully");
-//     }
-//     return Ok(());
-// }
+    if table_exists {
+        println!("Table lease_history already exists - skipping creation");
+    } else {
+        let check_server_response_type = "
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_type t
+                JOIN pg_namespace n ON n.oid = t.typnamespace
+                WHERE t.typname = 'server_response'
+            )";
+        let check_server_resp_type_row = client.query_one(check_server_response_type, &[]).await?;
+        let server_response_type_exists: bool = check_server_resp_type_row.get(0);
+        if !server_response_type_exists {
+            let create_enum = "
+                CREATE TYPE server_response AS ENUM (
+                    'ACK',
+                    'NAK'
+                )";
+            client.execute(create_enum, &[]).await?;
+        }
 
+        let check_lease_type_enum = "
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_type t
+                JOIN pg_namespace n ON n.oid = t.typnamespace
+                WHERE t.typname = 'lease_type'
+            )";
+        let check_lease_type_enum_row = client.query_one(check_lease_type_enum, &[]).await?;
+        let lease_type_enum_exists: bool = check_lease_type_enum_row.get(0);
+        if !lease_type_enum_exists {
+            let create_lease_type_enum = "
+                CREATE TYPE lease_type AS ENUM (
+                    'RENEWING',
+                    'INITIAL',
+                    'DECLINED'
+                )";
+            client.execute(create_lease_type_enum, &[]).await?;
+        }
+
+        let create_lease_history_table_query = "
+            CREATE TABLE IF NOT EXISTS lease_history (
+                id SERIAL PRIMARY KEY,
+                ip_address INET NOT NULL,
+                client_id VARCHAR(32) NOT NULL,
+                lease_start TIMESTAMP,
+                lease_end TIMESTAMP,
+                server_response server_response NOT NULL,
+                lease_type lease_type NOT NULL
+            )
+        ";
+        client.execute(create_lease_history_table_query, &[]).await?;
+        println!("Table lease_history created successfully");
+    }
+    return Ok(());
+}
 async fn fill_ip_addresses_table (client: &tokio_postgres::Client) -> Result<(), CustomError> {
+    //CHECK IF CONFIG FILE HAS CHANGED
+    //IF CONFIG FILE HAS CHANGED, DELETE ALL ENTRIES IN IP ADDRESSES TABLE AND FILL IT WITH NEW IP POOL
+    //OTHERWISE LEAVE THE TABLE AS IT IS
+
     if config_hash::check_config_changed("app/server-config.json").map_err(|e| CustomError::from(e))? {
         println!("Server configuration changed - updating IP addresses table");
         let new_hash = config_hash::calculate_config_hash("app/server-config.json").map_err(|e| CustomError::from(e))?;
@@ -120,7 +127,7 @@ async fn fill_ip_addresses_table (client: &tokio_postgres::Client) -> Result<(),
 
         let ip_pool = generate_ip_pool(start_ip, end_ip);
 
-        let mut clear_table = "DELETE FROM ip_addresses";
+        let clear_table = "DELETE FROM ip_addresses";
         client.execute(clear_table, &[]).await?;
 
         let insert_ip_query = "

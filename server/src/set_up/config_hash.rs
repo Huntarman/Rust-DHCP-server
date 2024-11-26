@@ -21,6 +21,7 @@ pub fn load_previous_hash() -> Result<Option<String>, io::Error> {
         Err(_) => Ok(None),
     }
 }
+//CHECK IF CONFIG FILE HAS CHANGED
 pub fn check_config_changed(file_path: &str) -> Result<bool, io::Error> {
     let new_hash = calculate_config_hash(file_path)?;
     if let Some(previous_hash) = load_previous_hash()? {

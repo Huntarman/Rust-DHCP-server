@@ -9,7 +9,7 @@ COPY server-config.json ./server-config.json
 RUN cargo build --release
 
 FROM debian:bookworm-slim
-
+STOPSIGNAL SIGTERM
 ENV RUST_LOG=info
 
 RUN apt-get update && apt-get install -y libssl-dev iproute2 iputils-ping postgresql-client && rm -rf /var/lib/apt/lists/*

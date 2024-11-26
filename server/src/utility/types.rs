@@ -26,6 +26,7 @@ pub struct DHCPMessage {
 }
 
 impl DHCPMessage {
+    //CREATE NEW DHCP MESSAGE FROM BUFFER
     pub fn from_buffer(buf: &[u8]) -> Result<Self, &'static str> {
         if buf.len() < 240 {
             return Err("Buffer size is too small to be a valid DHCP message");
@@ -41,7 +42,7 @@ impl DHCPMessage {
         let mut i = 4;
 
         while i < options.len() {
-            if options[i] == 0 {
+            if options[i] == 0 || options[i] == 255 {
                 break;
             }
             let len = *options.get(i + 1).ok_or("Options length out of bounds")? as usize;
@@ -51,8 +52,9 @@ impl DHCPMessage {
                 return Err("Options data truncated");
             }
             options_map.insert(options[i], options[i + 2..option_end].to_vec());
-            i = option_end;
+            i = option_end;   
         }
+        options_map.insert(255, Vec::new());
 
         Ok(DHCPMessage {
             op: buf[0],
@@ -86,6 +88,7 @@ impl DHCPMessage {
         })
     }
 
+    //CREATE NEW DHCP MESSAGE FROM PARAMETERS
     pub fn new(
         op: u8,
         htype: u8,
@@ -142,6 +145,7 @@ impl DHCPMessage {
         }
     }
 
+    //FUNCTION TO CONVERT DHCP MESSAGE TO VEC<U8> BUFFER
     pub fn to_buffer(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(236 + self.options.len());
 

@@ -6,11 +6,33 @@
     "default_gateway": "192.168.10.1",
     "dns_server": "10.0.2.1",
     "domain_name": "example.local",
-    "ip_address": "192.168.10.4"
+    "ip_address": "192.168.10.30",
+    "log_file": "server.log"
   },
   "ip_pool": {
     "range_start": "192.168.10.100",
     "range_end": "192.168.10.150"
+  },
+  "options_extended": {
+    "subnet_mask": "255.255.255.0",
+    "time_offset": 0,
+    "router": ["192.168.10.1", "192.168.10.200"],
+    "time_server": ["192.168.10.102"],
+    "name_server": ["192.168.10.122"],
+    "domain_name_server": ["192.168.10.150"],
+    "log_server": ["192.168.10.201"],
+    "cookie_server": ["192.168.10.202"],
+    "lpr_server": ["192.168.10.203"],
+    "impress_server": ["192.168.10.204"],
+    "resource_location_server": ["192.168.10.205"],
+    "boot_file_size": 512,
+    "merit_dump_file": "/example/tmp/merit.dump",
+    "domain_name": "example.local",
+    "swap_server": "192.168.10.244",
+    "root_path": "/example/root",
+    "extensions_path": "/example/extensions",
+    "broadcast_address": "192.168.10.255",
+    "network_time_protocol_servers": ["192.168.10.206"]
   },
   "restricted_ips": ["192.168.10.102", "192.168.10.122", "192.168.10.150"]
 }

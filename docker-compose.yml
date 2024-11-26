@@ -11,8 +11,6 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
-    networks:
-      - dhcp_network
 
   rust_dhcp_server:
     build:
@@ -20,11 +18,9 @@ services:
     container_name: rust_dhcp_server
     env_file:
       - .env
-    networks:
-      dhcp_network:
-        ipv4_address: 192.168.10.4
     ports:
       - "67:67/udp"
+      - "68:68/udp"
     depends_on:
       - db
     cap_add:
@@ -35,22 +31,91 @@ services:
     privileged: true
     entrypoint: ["/usr/local/bin/wait-for-db.sh", "/usr/local/bin/server"]
 
-  dhcp_client:
-    image: busybox
-    container_name: dhcp_client
-    networks:
-      - dhcp_network
-    entrypoint: ["udhcpc", "-i", "eth0", "-f", "-R"]
-
-  # client_test:
-  #   build:
-  #     context: ./client_test
-  #   container_name: client_test
-  #   networks:
-  #     - dhcp_network
+  # dhcp_client:
+  #   image: busybox
+  #   container_name: dhcp_client
   #   depends_on:
   #     - rust_dhcp_server
-  #   entrypoint: ["python", "/usr/src/app/create_dhcp_packets.py"]
+  #   networks:
+  #     dhcp_network: {}
+  #   entrypoint: ["sh"]
+  #   stdin_open: true
+  #   tty: true
+  #   privileged: true
+  #   volumes:
+  #     - ./udhcpc-script.sh:/etc/udhcpc/udhcpc-script.sh:ro
+
+  # dhcp_client:
+  #   build:
+  #     context: ./client_test
+  #   networks:
+  #     dhcp_network:
+  #       ipv4_address: 192.168.10.9
+  #   stdin_open: true
+  #   tty: true
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - NET_RAW
+
+  # dhcp_client_busybox:
+  #   image: busybox
+  #   container_name: dhcp_client_busybox
+  #   networks:
+  #     - dhcp_network
+  #   entrypoint: ["udhcpc", "-i", "eth0", "-f", "-R"]
+  #   stdin_open: true
+  #   tty: true
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - NET_RAW
+
+  # dhcp_client_1:
+  #   image: busybox
+  #   container_name: dhcp_client_1
+  #   networks:
+  #     - dhcp_network
+  #   entrypoint: ["udhcpc", "-i", "eth0", "-R"]
+  #   stdin_open: true
+  #   tty: true
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - NET_RAW
+
+  # dhcp_client_2:
+  #   image: busybox
+  #   container_name: dhcp_client_2
+  #   networks:
+  #     - dhcp_network
+  #   entrypoint: ["udhcpc", "-i", "eth0", "-R"]
+  #   stdin_open: true
+  #   tty: true
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - NET_RAW
+
+  # dhcp_client_3:
+  #   image: busybox
+  #   container_name: dhcp_client_3
+  #   networks:
+  #     - dhcp_network
+  #   entrypoint: ["udhcpc", "-i", "eth0", "-R"]
+  #   stdin_open: true
+  #   tty: true
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - NET_RAW
+
+  # dhcp_client_4:
+  #   image: busybox
+  #   container_name: dhcp_client_4
+  #   networks:
+  #     - dhcp_network
+  #   entrypoint: ["udhcpc", "-i", "eth0", "-R"]
+  #   stdin_open: true
+  #   tty: true
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - NET_RAW
 
 volumes:
   postgres_data:
