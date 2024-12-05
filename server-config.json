@@ -4,7 +4,7 @@
     "renewal_time": 30,
     "subnet_mask": "255.255.255.0",
     "default_gateway": "192.168.10.1",
-    "dns_server": "10.0.2.1",
+    "dns_server": "8.8.8.8",
     "domain_name": "example.local",
     "ip_address": "192.168.10.30",
     "log_file": "server.log"

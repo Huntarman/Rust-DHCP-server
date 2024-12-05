@@ -4,7 +4,7 @@ def send_dhcp_request():
     """
     Sends a DHCP Discover packet to discover DHCP servers.
     """
-    mac = RandMAC()  # Random MAC address
+    mac = RandMAC()
     dhcp_discover = Ether(src=mac, dst="ff:ff:ff:ff:ff:ff") / \
                     IP(src="0.0.0.0", dst="255.255.255.255") / \
                     UDP(sport=68, dport=67) / \
@@ -15,8 +15,8 @@ def send_dhcp_request():
 
 def send_dhcp_decline():
     mac = RandMAC()
-    fake_server_ip = "192.168.1.1"  # Replace with the expected DHCP server's IP address
-    declined_ip = "192.168.1.100"  # Replace with the IP address being declined
+    fake_server_ip = "192.168.1.30"
+    declined_ip = "192.168.1.100"
 
     dhcp_decline = Ether(src=mac, dst="ff:ff:ff:ff:ff:ff") / \
                    IP(src="0.0.0.0", dst="255.255.255.255") / \
@@ -33,7 +33,7 @@ def send_dhcp_decline():
 
 def send_dhcp_inform():
     mac = RandMAC()
-    client_ip = "192.168.1.50"  # Replace with the client's assigned IP address
+    client_ip = "192.168.1.50"
 
     dhcp_inform = Ether(src=mac, dst="ff:ff:ff:ff:ff:ff") / \
                   IP(src=client_ip, dst="255.255.255.255") / \
@@ -47,9 +47,6 @@ def send_dhcp_inform():
     sendp(dhcp_inform, iface="eth0", verbose=True)
 
 def send_dhcp_message(msg_type):
-    """
-    Sends a specified DHCP message type to the server.
-    """
     mac = RandMAC()
     dhcp_msg = Ether(src=mac, dst="ff:ff:ff:ff:ff:ff") / \
                IP(src="0.0.0.0", dst="255.255.255.255") / \

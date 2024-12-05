@@ -54,9 +54,6 @@ impl Server {
                 Ok(Err(e)) => eprintln!("Failed to receive data: {}", e),
                 Err(_) => println!("Receive timed out"),
             }
-            // println!("Iteration: {}", iterator);
-            // iterator += 1;
-            // sleep(Duration::from_millis(5)).await;
         }
     }
 
@@ -157,12 +154,12 @@ impl Server {
         //IF NOT SEND TO BROADCAST
         println!("Sending response to client: {:?}", response);
         let dest_addr: std::net::SocketAddr = if response.flags & 0x8000 != 0 {
-            "172.20.0.255:68".parse().unwrap()
+            "255.255.255.255:68".parse().unwrap()
         } else if *addr == Ipv4Addr::new(0, 0, 0, 0) {
-            "172.20.0.255:68".parse().unwrap()
+            "255.255.255.255:68".parse().unwrap()
         } else {
-            //format!("{}:68", addr).parse().unwrap()
-            "172.20.0.255:68".parse().unwrap()
+            format!("{}:68", addr).parse().unwrap()
+            //"255.255.255.255:68".parse().unwrap()
         };
 
         let mut response_buffer = response.to_buffer();
@@ -327,6 +324,7 @@ impl Server {
         let log_query;
         let log_message;
         //CHECK IF CLIENT WANTS TO EXTEND LEASE
+        sleep(Duration::from_millis(5)).await;
         if ip_address == Ipv4Addr::new(0, 0, 0, 0) && message.ciaddr != Ipv4Addr::new(0, 0, 0, 0) {
             println!("Renewing IP address");
             inet_type_ip = IpAddr::V4(message.ciaddr);

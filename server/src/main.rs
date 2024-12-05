@@ -22,7 +22,7 @@ const DHCP_SERVER_PORT: u16 = 67;
 async fn main() -> Result<(), Box<dyn Error>> {
     //SET UP ENV
     dotenv().ok();
-    let db_url = env::var("POSTGRES_URL").expect("Failed to find POSTGRES_URL");
+    let db_url = env::var("POSTGRES_URI").expect("Failed to find POSTGRES_URL");
     let (client, connection) = tokio_postgres::connect(&db_url, NoTls).await?;
     
     println!("Detected local timezone: {}", chrono::Local::now());
@@ -45,6 +45,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Starting DHCP server");
 
     //OPEN SOCKET
+    //ON WINDOWS USE THE INTERFACE IP ADDRESS
     let dhcp_socket = UdpSocket::bind(("0.0.0.0", DHCP_SERVER_PORT)).await?;
     dhcp_socket.set_broadcast(true)?;
     println!("DHCP server listening on port {}", DHCP_SERVER_PORT);
