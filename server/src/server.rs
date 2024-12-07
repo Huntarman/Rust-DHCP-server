@@ -159,8 +159,8 @@ impl Server {
         } else if *addr == Ipv4Addr::new(0, 0, 0, 0) {
             "255.255.255.255:68".parse().unwrap()
         } else {
-            format!("{}:68", addr).parse().unwrap()
-            //"255.255.255.255:68".parse().unwrap()
+            //format!("{}:68", addr).parse().unwrap()
+            "255.255.255.255:68".parse().unwrap()
         };
 
         let mut response_buffer = response.to_buffer();
@@ -594,21 +594,22 @@ impl Server {
      FUNCTIONS FOR CONTROLLING THE SERVER BEHAVIOR
      */
     async fn should_nak(&self, message: &DHCPMessage, config: &Config, db: &Client) -> bool {
-        let requested_ip = match message.options_map.get(&REQUESTED_IP) {
+        let mut requested_ip = match message.options_map.get(&REQUESTED_IP) {
             Some(v) if v.len() == 4 => {
                 Ipv4Addr::new(v[0], v[1], v[2], v[3])
             },
-            _ => message.ciaddr,
+            _ => Ipv4Addr::new(0, 0, 0, 0),
         };
 
         let renewing: bool = (requested_ip == Ipv4Addr::new(0, 0, 0, 0) && message.ciaddr != Ipv4Addr::new(0, 0, 0, 0));
-
         if requested_ip == Ipv4Addr::new(0, 0, 0, 0) && !renewing {
             println!("Client requested lease of IP address without requested IP option");
             self.logger.log(&format!("[INFO] Client {:?} requested lease of IP address without requested IP option",
             message.chaddr.iter().map(|byte| format!("{:02X}", byte)).collect::<Vec<_>>().join(":"))).await;
             return true;
         }
+
+        requested_ip = if requested_ip == Ipv4Addr::new(0, 0, 0, 0) {message.ciaddr} else {requested_ip};
 
         if (u32::from(requested_ip) < u32::from(config.ip_pool.range_start.parse::<Ipv4Addr>().unwrap()) ||
             u32::from(requested_ip) > u32::from(config.ip_pool.range_end.parse::<Ipv4Addr>().unwrap())) && !renewing {
