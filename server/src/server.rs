@@ -55,13 +55,14 @@ impl Server {
                 Err(_) => println!("Receive timed out"),
             }
         }
+        sleep(Duration::from_millis(10)).await;
     }
 
     async fn handle_message(&self, dhcp_message: DHCPMessage, config: Config, db: &Client) {
         //UPDATE DATABASE BEFORE PROCESSING EVERY MESSAGE
         self.update_db(db).await;
         println!("Handling message: {:?}", dhcp_message);
-        match dhcp_message.options_map.get(&53).and_then(|v| v.get(0)) {
+        match dhcp_message.options_map.get(&MESSAGE_TYPE).and_then(|v| v.get(0)) {
             
             //DHCPDISCOVER
             Some(&DHCPDISCOVER) => {
@@ -131,7 +132,7 @@ impl Server {
             //DHCPINFORM
             Some(&DHCPINFORM) => {
                 println!("Received DHCP Inform");
-                 if let Some(response) = self.build_ack_response_offer(&dhcp_message, &config).await {
+                 if let Some(response) = self.build_ack_response_inform(&dhcp_message, &config).await {
                     println!("Sending DHCP Ack for DHCPINFORM");
                     self.logger.log(&format!("[INFO] DHCP Inform from client: {:?}",
                     dhcp_message.chaddr.iter().map(|byte| format!("{:02X}", byte)).collect::<Vec<_>>().join(":"))).await;
@@ -324,7 +325,6 @@ impl Server {
         let log_query;
         let log_message;
         //CHECK IF CLIENT WANTS TO EXTEND LEASE
-        sleep(Duration::from_millis(5)).await;
         if ip_address == Ipv4Addr::new(0, 0, 0, 0) && message.ciaddr != Ipv4Addr::new(0, 0, 0, 0) {
             println!("Renewing IP address");
             inet_type_ip = IpAddr::V4(message.ciaddr);
@@ -424,7 +424,7 @@ impl Server {
     }
 
     //BUILDING DHCPACK RESPONSE TO DHCPINFORM
-    async fn build_ack_response_offer(&self, message: &DHCPMessage, config: &Config) -> Option<DHCPMessage> {
+    async fn build_ack_response_inform(&self, message: &DHCPMessage, config: &Config) -> Option<DHCPMessage> {
         //IF CLIENT DID NOT REQUEST ANY PARAMETERS
         //SEND SOME DEFAULT PARAMETERS
         if message.options_map.get(&PARAMETER_REQUEST_LIST).is_none() {
@@ -601,27 +601,29 @@ impl Server {
             _ => message.ciaddr,
         };
 
-        if requested_ip == Ipv4Addr::new(0, 0, 0, 0) {
+        let renewing: bool = (requested_ip == Ipv4Addr::new(0, 0, 0, 0) && message.ciaddr != Ipv4Addr::new(0, 0, 0, 0));
+
+        if requested_ip == Ipv4Addr::new(0, 0, 0, 0) && !renewing {
             println!("Client requested lease of IP address without requested IP option");
             self.logger.log(&format!("[INFO] Client {:?} requested lease of IP address without requested IP option",
             message.chaddr.iter().map(|byte| format!("{:02X}", byte)).collect::<Vec<_>>().join(":"))).await;
             return true;
         }
 
-        if u32::from(requested_ip) < u32::from(config.ip_pool.range_start.parse::<Ipv4Addr>().unwrap()) ||
-            u32::from(requested_ip) > u32::from(config.ip_pool.range_end.parse::<Ipv4Addr>().unwrap()) {
+        if (u32::from(requested_ip) < u32::from(config.ip_pool.range_start.parse::<Ipv4Addr>().unwrap()) ||
+            u32::from(requested_ip) > u32::from(config.ip_pool.range_end.parse::<Ipv4Addr>().unwrap())) && !renewing {
             println!("Requested IP is outside the server's pool");
             self.logger.log(&format!("[INFO] Client {:?} requested lease of IP address outside the server's pool",
             message.chaddr.iter().map(|byte| format!("{:02X}", byte)).collect::<Vec<_>>().join(":"))).await;
             return true;
         }
 
-        if config.restricted_ips.contains(&requested_ip.to_string()) {
+        if config.restricted_ips.contains(&requested_ip.to_string()) && !renewing {
             println!("Requested IP is restricted");
             return true;
         }
         let client_id: String = message.chaddr.iter().map(|&c| format!("{:02x}", c)).collect::<Vec<String>>().join("");
-
+        
         let query = "SELECT ip_address
                     FROM ip_addresses
                     WHERE ip_address = $1
@@ -644,7 +646,6 @@ impl Server {
             }
         };
 
-    
         if let Some(server_identifier) = message.options_map.get(&SERVER_IDENTIFIER) {
             let server_ip = &config.server.ip_address.parse::<Ipv4Addr>().unwrap().octets();
             if server_identifier != &server_ip {
@@ -653,7 +654,7 @@ impl Server {
                 message.chaddr.iter().map(|byte| format!("{:02X}", byte)).collect::<Vec<_>>().join(":"))).await;
                 return true;
             }
-        } else {
+        } else if !renewing {
             println!("Server Identifier not present in options");
             self.logger.log(&format!("[INFO] Client {:?} requested lease of IP address without Server Identifier option",
             message.chaddr.iter().map(|byte| format!("{:02X}", byte)).collect::<Vec<_>>().join(":"))).await;
