@@ -210,12 +210,14 @@ impl Server {
         .and_then(|v| if v.len() == 4 { Some([v[0], v[1], v[2], v[3]]) } else { None })
         .map(Ipv4Addr::from)
         .unwrap_or(Ipv4Addr::new(0, 0, 0, 0)));
-        let check_requested_ip = "SELECT ip_address
+
+        let search_client_id = "SELECT ip_address
                                 FROM IP_addresses
-                                WHERE ip_address = $1
-                                AND allocated = false
+                                WHERE client_id = $1
                                 LIMIT 1";
-        let mut row = match db.query_opt(check_requested_ip, &[&requested_ip_address]).await {
+        let client_id: String = message.chaddr.iter().map(|&c| format!("{:02x}", c)).collect::<Vec<String>>().join("");
+        //CHECK IF CLIENT HAS ALREADY ALLOCATED IP ADDRESS
+        let mut row = match db.query_opt(search_client_id, &[&client_id]).await {
             Ok(Some(row)) => Some(row),
             Ok(None) => None,
             Err(e) => {
@@ -224,16 +226,15 @@ impl Server {
                 return None;
             }
         };
-
-        //CHECK IF CLIENT HAS ALREADY ALLOCATED IP ADDRESS
-        if row.is_none() {
-            let search_client_id = "
-            SELECT ip_address
-            FROM IP_addresses
-            WHERE client_id = $1
-            LIMIT 1";
-            let client_id: String = message.chaddr.iter().map(|&c| format!("{:02x}", c)).collect::<Vec<String>>().join("");
-            row = match db.query_opt(search_client_id, &[&client_id]).await {
+        
+        //IF NOT SEARCH FOR REQUESTED IP ADDRESS
+        if row.is_none() {    
+            let check_requested_ip = "SELECT ip_address
+                                    FROM IP_addresses
+                                    WHERE ip_address = $1
+                                    AND allocated = false
+                                    LIMIT 1";
+            row = match db.query_opt(check_requested_ip, &[&requested_ip_address]).await {
                 Ok(Some(row)) => Some(row),
                 Ok(None) => None,
                 Err(e) => {
@@ -623,8 +624,30 @@ impl Server {
             println!("Requested IP is restricted");
             return true;
         }
+
+        let check_client_id = "SELECT ip_address
+                                FROM ip_addresses
+                                WHERE client_id = $1
+                                AND NOT ip_address = $2
+                                LIMIT 1";
+
         let client_id: String = message.chaddr.iter().map(|&c| format!("{:02x}", c)).collect::<Vec<String>>().join("");
         
+        let _row_id = match db.query_opt(check_client_id, &[&client_id, &IpAddr::V4(requested_ip)]).await {
+            Ok(None) => Some(0),
+            Ok(Some(_row_id)) => {
+                println!("Client leases different IP");
+                self.logger.log(&format!("[INFO] Client {:?} requested lease of IP address while allocation other IP address",
+                message.chaddr.iter().map(|byte| format!("{:02X}", byte)).collect::<Vec<_>>().join(":"))).await;
+                return true;
+            }
+            Err(e) => {
+                eprintln!("Database query error: {}", e);
+                self.logger.log(&format!("[ERROR] Database query error: {}", e)).await;
+                return true;
+            }
+        };
+
         let query = "SELECT ip_address
                     FROM ip_addresses
                     WHERE ip_address = $1
