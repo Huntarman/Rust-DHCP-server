@@ -612,14 +612,14 @@ impl Server {
         requested_ip = if requested_ip == Ipv4Addr::new(0, 0, 0, 0) {message.ciaddr} else {requested_ip};
 
         if (u32::from(requested_ip) < u32::from(config.ip_pool.range_start.parse::<Ipv4Addr>().unwrap()) ||
-            u32::from(requested_ip) > u32::from(config.ip_pool.range_end.parse::<Ipv4Addr>().unwrap())) && !renewing {
+            u32::from(requested_ip) > u32::from(config.ip_pool.range_end.parse::<Ipv4Addr>().unwrap())) {
             println!("Requested IP is outside the server's pool");
             self.logger.log(&format!("[INFO] Client {:?} requested lease of IP address outside the server's pool",
             message.chaddr.iter().map(|byte| format!("{:02X}", byte)).collect::<Vec<_>>().join(":"))).await;
             return true;
         }
 
-        if config.restricted_ips.contains(&requested_ip.to_string()) && !renewing {
+        if config.restricted_ips.contains(&requested_ip.to_string()) {
             println!("Requested IP is restricted");
             return true;
         }
