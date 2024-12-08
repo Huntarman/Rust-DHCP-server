@@ -159,8 +159,8 @@ impl Server {
         } else if *addr == Ipv4Addr::new(0, 0, 0, 0) {
             "255.255.255.255:68".parse().unwrap()
         } else {
-            //format!("{}:68", addr).parse().unwrap()
-            "255.255.255.255:68".parse().unwrap()
+            format!("{}:68", addr).parse().unwrap()
+            //"255.255.255.255:68".parse().unwrap()
         };
 
         let mut response_buffer = response.to_buffer();
